@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class Wormhole:
     def __init__(self, a, rho, W):
         self.a = a

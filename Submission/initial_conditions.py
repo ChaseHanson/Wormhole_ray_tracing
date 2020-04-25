@@ -27,9 +27,9 @@ theta_cs     = np.pi/8
 phi_cs       = np.pi/6
 
 # The unit vector N pointing in this direction has Cartesian components
-Nx = np.sin(theta_cs)*np.cos(phi_cs)
-Ny = np.sin(theta_cs)*np.sin(phi_cs)
-Nz = np.cos(theta_cs)
+N_x = np.sin(theta_cs)*np.cos(phi_cs)
+N_y = np.sin(theta_cs)*np.sin(phi_cs)
+N_z = np.cos(theta_cs)
 
 # The direction n of the propagation of the incoming ray that arrives from -N
 n_l     = -N_x

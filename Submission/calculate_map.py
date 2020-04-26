@@ -107,26 +107,33 @@ def calc_b_Bsquared(p_phi, r, n_theta, n_phi):
     return b, B_squared
 
 
-def geo_eqns(p_l,p_theta,ell,theta,phi,wormhole):
-    N_x = np.sin(theta)*np.cos(phi)
-    N_y = np.sin(theta)*np.sin(phi)
-    N_z = np.cos(theta)
-    n_l     = -N_x
-    n_phi   = -N_y
-    n_theta =  N_z
-    r        = wormhole.calc_r(ell)
-    drdl     = wormhole.calc_drdl(ell)
-    p_l     = n_l
-    p_theta = r * np.sin(theta) * n_theta
-    b     = p_phi
-    Bsqrd = r**2*(n_theta**2 + n_phi**2)
-    geo = np.array([p_l, p_theta/r**2,b/(r**2*(np.sin(theta))**2),Bsqrd*(drdl/r**3),(b**2/r**2)*(np.cos(theta)/(np.sin(theta)**3))])
-    return geo
+def geo_eqns(ray_arr, n_theta, n_phi, wormhole):
+    # Sort out the quantities in the ray array
+    ell, theta, phi = ray_arr[0], ray_arr[1], ray_arr[2]
+    p_ell, p_theta = ray_arr[3], ray_arr[4]
+
+    # The ray's distance from the wormhole's axis of symmetry
+    r = wormhole.calc_r(ell)
+    # And how quickly the ray's distance is changing
+    dr_dl     = wormhole.calc_drdl(ell)
+
+    # The ray's constants of motion
+    p_phi = r * np.sin(theta) * n_phi  # Equation (A9c)
+    b, B_squared = calc_b_Bsquared(p_phi, r, n_theta, n_phi)
+
+    # Set up the right hand side of the system with Equations (A7a) - (A7e)
+    dl_dt = p_ell  # A7a
+    dtheta_dt = p_theta / r**2  # A7b
+    dphi_dt = b / (r * np.sin(theta))**2  # A7c
+    dpl_dt = B_squared * dr_dl / r**3  # A7d
+    dptheta_dt = (b / r)**2 * np.cos(theta) / np.sin(theta)**3 # A7e
+
+    return np.array([dl_dt, dtheta_dt, dphi_dt, dpl_dt, dptheta_dt])
 
 
-def integrate_geo_equations(t_end=-100):
+def integrate_geo_equations(t_end=-100, return_map=False):
     # Wormhole parameters
-    a = 1  # Half the height of wormhole's cylinder interior
+    a = 0.01  # Half the height of wormhole's cylinder interior
            # in the embedding space
     rho = 200 * a  # Radius of the cylinder
     W = 0.05 * rho  # Black hole lensing width, related to black hole mass
@@ -163,22 +170,15 @@ def integrate_geo_equations(t_end=-100):
                         p_ell, p_theta])
 
     # The right hand side of the ray equations
-    def f(t, y):
-        return geo_eqns(y, wormhole)
+    f = lambda t, y: geo_eqns(y, n_theta, n_phi, wormhole)
 
-    # Numerically integrate the ray equation with scipy.integrate.solve_ivp
+    # Numerically integrate the ray equations with scipy.integrate.solve_ivp
     t_range = (0, t_end)
     map = solve_ivp(f, t_range, ray_arr, method='RK45')
 
-
-# def integrate_geo_eqns():
-#     # y = np.zeros()
-#     def f(t, y):
-#         return geo_eqns(y[3], y[4], y[0], y[1], y[2], wormhole)
-#
-#     print(map.y)
-#     print(np.shape(map.y))
+    if return_map:
+        return map
 
 
 if __name__ == '__main__':
-    integrate_geo_eqns()
+    map = integrate_geo_equations(t_end=-1e5)

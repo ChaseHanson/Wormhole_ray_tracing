@@ -181,4 +181,10 @@ def integrate_geo_equations(t_end=-100, return_map=False):
 
 
 if __name__ == '__main__':
-    map = integrate_geo_equations(t_end=-1e5)
+    map = integrate_geo_equations(t_end=-1e5, return_map=True)
+    print('Shape of map: {}\n'.format(map.y.shape))
+    print('ell: {}\n'.format(map.y[0]))
+    print('theta: {}\n'.format(map.y[1]))
+    print('phi: {}\n'.format(map.y[2]))
+    print('p_ell: {}\n'.format(map.y[3]))
+    print('p_theta: {}'.format(map.y[4]))

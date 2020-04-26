@@ -34,7 +34,7 @@ class Wormhole:
         return r
 
 
-    def calc_drdl(ell, M):
+    def calc_drdl(self,ell):
         """
         Calculate dr/dl with the equation given in footnote 19
 
@@ -48,4 +48,4 @@ class Wormhole:
         dr/dl : float
 
         """
-        return 2 / np.pi * np.arctan((2 * ell) / (np.pi * M))
+        return 2 / np.pi * np.arctan((2 * ell) / (np.pi * self.M))

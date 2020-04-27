@@ -1,6 +1,35 @@
 import numpy as np
+import pickle
 from scipy.integrate import solve_ivp
 from wormhole import Wormhole
+
+
+def wrap_angle(angle, max_angle=2*np.pi, exclusive=True):
+    """
+    Wraps angles to the range [0, max_angle) (exclusive by
+    default, but can be inclusive of max_angle)
+
+    Parameters
+    ----------
+    angle : int, float, or array-like
+        The angle(s) to wrap
+    max_angle : int or float, optional
+        The maximum angle possible (default 2*pi)
+    exclusive : bool, optional
+        Whether to exclude the maximum angle (default True)
+
+    Returns
+    -------
+    wrapped_angle : int, float, or array_like
+        The wrapped angle(s)
+    """
+    if exclusive:
+        wrapped_angle = angle % max_angle
+    else:
+        max_angle_ind = np.where(angle == max_angle)[0]
+        wrapped_angle = angle % max_angle
+        wrapped_angle[max_angle_ind] = max_angle
+    return wrapped_angle
 
 
 def calc_camera_unit_vector(theta_cs, phi_cs):
@@ -20,6 +49,11 @@ def calc_camera_unit_vector(theta_cs, phi_cs):
     N_x, N_y, N_z : float
         The x, y, and z components of the unit vector
     """
+    # Reshape the arrays so they can be multiplied together
+    Ntheta, Nphi = len(theta_cs), len(phi_cs)
+    theta_cs = np.broadcast_to(theta_cs, (Nphi, Ntheta))
+    phi_cs = np.broadcast_to(phi_cs, (Ntheta, Nphi)).T
+
     # Equation (A9a)
     N_x = np.sin(theta_cs) * np.cos(phi_cs)
     N_y = np.sin(theta_cs) * np.sin(phi_cs)
@@ -131,7 +165,7 @@ def geo_eqns(ray_arr, n_theta, n_phi, wormhole):
     return np.array([dl_dt, dtheta_dt, dphi_dt, dpl_dt, dptheta_dt])
 
 
-def integrate_geo_equations(t_end=-100, return_map=False):
+def integrate_geo_eqns(t_end=-100, return_map=False):
     # Wormhole parameters
     a = 0.01  # Half the height of wormhole's cylinder interior
            # in the embedding space
@@ -139,16 +173,19 @@ def integrate_geo_equations(t_end=-100, return_map=False):
     W = 0.05 * rho  # Black hole lensing width, related to black hole mass
     wormhole = Wormhole(a, rho, W)  # Create a wormhole object
 
-    # Camera and camera sky parameters
+    # Camera location
     ell_camera = 6.25 * rho + a  # Radial distance of the camera's location
     theta_camera = np.pi/2  # Zenith angle of the camera's location,
                             # in the equatorial plane
     phi_camera = 0  # Azimuthal angle of the camera's location
-    theta_cs, phi_cs = np.pi / 8, np.pi / 6  # A location in the camera sky
+    
+    # Angles to evaluate map at in camera sky
+    Ntheta, Nphi = 10, 20
+    theta_cs = np.linspace(0, np.pi, Ntheta)
+    phi_cs = np.linspace(0, 2*np.pi, Nphi)
 
     # Calculate the unit vector in the camera sky
     N_x, N_y, N_z = calc_camera_unit_vector(theta_cs, phi_cs)
-
     # Calculate the vector describing the ray's direction of propagation
     n_ell, n_phi, n_theta = calc_propagation_vector(N_x, N_y, N_z)
 
@@ -166,25 +203,46 @@ def integrate_geo_equations(t_end=-100, return_map=False):
     # Initial conditions for (ell, theta, phi, p_ell, p_theta)
     # The ray starts at the camera's location, we will integrate
     # backwards in time
-    ray_arr = np.array([ell_camera, theta_camera, phi_camera,
+    ell_init = np.full(p_ell.shape, fill_value=ell_camera)
+    theta_init = np.full(p_ell.shape, fill_value=theta_camera)
+    phi_init = np.full(p_ell.shape, fill_value=phi_camera)
+    ray_arr = np.array([ell_init, theta_init, phi_init,
                         p_ell, p_theta])
 
-    # The right hand side of the ray equations
-    f = lambda t, y: geo_eqns(y, n_theta, n_phi, wormhole)
-
-    # Numerically integrate the ray equations with scipy.integrate.solve_ivp
+    # NOTE: Good candidate for MPI if this takes ages to run
+    # Numerically integrate the ray equations with scipy
     t_range = (0, t_end)
-    map = solve_ivp(f, t_range, ray_arr, method='RK45')
+    ray_map = np.zeros((Nphi, Ntheta, 3))  # 3 for (ell, theta, phi)
+    for i in range(Nphi):
+        for j in range(Ntheta):
+            # The right hand side of the ray equations
+            f = lambda t, y: geo_eqns(y, n_theta[i, j],
+                                      n_phi[i, j], wormhole)
+            init_ray_arr = ray_arr[:, i, j]
+            ray_integrated = solve_ivp(f, t_range, init_ray_arr,
+                                       method='RK45')
+            final_ray = ray_integrated.y[:, -1]
+            
+            # Store the sign of ell, which determines which
+            # celestial sphere we're on
+            ray_map[i, j, 0] = np.sign(final_ray[0])
+            # Store phi and theta
+            ray_map[i, j, 1:3] = final_ray[1:3]            
 
     if return_map:
-        return map
+        return theta_cs, phi_cs, ray_map
 
 
 if __name__ == '__main__':
-    map = integrate_geo_equations(t_end=-1e5, return_map=True)
-    print('Shape of map: {}\n'.format(map.y.shape))
-    print('ell: {}\n'.format(map.y[0]))
-    print('theta: {}\n'.format(map.y[1]))
-    print('phi: {}\n'.format(map.y[2]))
-    print('p_ell: {}\n'.format(map.y[3]))
-    print('p_theta: {}'.format(map.y[4]))
+    theta, phi, ray_map = integrate_geo_eqns(t_end=-1e5,
+                                             return_map=True)
+    # Wrap angles to the appropriate interval
+    ray_map[:, :, 1] = wrap_angle(ray_map[:, :, 1], 2*np.pi)
+    ray_map[:, :, 2] = wrap_angle(ray_map[:, :, 2], np.pi,
+                                  exclusive=False)
+
+    # Save the sampled angles and corresponding map
+    with open('data/angles.pickle', 'wb') as f:
+        pickle.dump({'theta': theta, 'phi': phi}, f)
+    with open('data/ray_map.pickle', 'wb') as f:
+        pickle.dump(ray_map, f)

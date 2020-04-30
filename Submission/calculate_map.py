@@ -1,6 +1,7 @@
 import numpy as np
-import pickle
 from scipy.integrate import solve_ivp
+import pickle
+import datetime
 from wormhole import Wormhole
 
 
@@ -165,7 +166,7 @@ def geo_eqns(ray_arr, n_theta, n_phi, wormhole):
     return np.array([dl_dt, dtheta_dt, dphi_dt, dpl_dt, dptheta_dt])
 
 
-def integrate_geo_eqns(t_end=-100, return_map=False):
+def integrate_geo_eqns(t_end=-1e7, return_map=False):
     # Wormhole parameters
     a = 0.01  # Half the height of wormhole's cylinder interior
            # in the embedding space
@@ -178,7 +179,7 @@ def integrate_geo_eqns(t_end=-100, return_map=False):
     theta_camera = np.pi/2  # Zenith angle of the camera's location,
                             # in the equatorial plane
     phi_camera = 0  # Azimuthal angle of the camera's location
-    
+
     # Angles to evaluate map at in camera sky
     Ntheta, Nphi = 25, 50
     theta_cs = np.linspace(0, np.pi, Ntheta)
@@ -222,20 +223,25 @@ def integrate_geo_eqns(t_end=-100, return_map=False):
             ray_integrated = solve_ivp(f, t_range, init_ray_arr,
                                        method='RK45')
             final_ray = ray_integrated.y[:, -1]
-            
+
             # Store the sign of ell, which determines which
             # celestial sphere we're on
             ray_map[i, j, 0] = np.sign(final_ray[0])
             # Store phi and theta
-            ray_map[i, j, 1:3] = final_ray[1:3]            
+            ray_map[i, j, 1:3] = final_ray[1:3]
 
     if return_map:
         return theta_cs, phi_cs, ray_map
 
 
 if __name__ == '__main__':
-    theta, phi, ray_map = integrate_geo_eqns(t_end=-1e5,
+    start = datetime.datetime.now()
+    print('Started at {}'.format(start.strftime('%Y-%m-%d %H:%M:%S')))
+    theta, phi, ray_map = integrate_geo_eqns(t_end=-1e7,
                                              return_map=True)
+    end = datetime.datetime.now()
+    print('Ended at {}'.format(end.strftime('%Y-%m-%d %H:%M:%S')))
+    print('Elapsed time: {}'.format(end - start))
     # Wrap angles to the appropriate interval
     ray_map[:, :, 1] = wrap_angle(ray_map[:, :, 1], 2*np.pi)
     ray_map[:, :, 2] = wrap_angle(ray_map[:, :, 2], np.pi,

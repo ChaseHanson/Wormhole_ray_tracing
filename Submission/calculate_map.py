@@ -180,7 +180,7 @@ def integrate_geo_eqns(t_end=-100, return_map=False):
     phi_camera = 0  # Azimuthal angle of the camera's location
     
     # Angles to evaluate map at in camera sky
-    Ntheta, Nphi = 10, 20
+    Ntheta, Nphi = 25, 50
     theta_cs = np.linspace(0, np.pi, Ntheta)
     phi_cs = np.linspace(0, 2*np.pi, Nphi)
 

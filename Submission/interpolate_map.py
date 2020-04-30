@@ -1,8 +1,7 @@
 import numpy as np
 import pickle
-from scipy.interpolate import interp2d
+from scipy.interpolate import RegularGridInterpolator
 from scipy import ndimage
-
 
 def load_map_data(angle_file, map_file):
     """
@@ -49,19 +48,20 @@ def create_map_interp_funcs(angles, ray_map):
 
     # Reshape the arrays to specify the coordinates of
     # each point
-    Ntheta, Nphi = len(theta), len(phi)
-    theta = np.broadcast_to(theta, (Nphi, Ntheta))
-    phi = np.broadcast_to(phi, (Ntheta, Nphi)).T
-    import pdb; pdb.set_trace()
+    # Ntheta, Nphi = len(theta), len(phi)
+    # theta = np.broadcast_to(theta, (Nphi, Ntheta))
+    # phi = np.broadcast_to(phi, (Ntheta, Nphi)).T
+    # import pdb; pdb.set_trace()
 
-    ndimage.map_coordinates(ray_map[:, :, 1])
+    # ndimage.map_coordinates(ray_map[:, :, 1])
     # # Interpolate theta and phi individually
     # interp_theta = interp2d(theta, phi, ray_map[:, :, 1])
     # interp_phi = interp2d(theta, phi, ray_map[:, :, 2])
-    return interp_theta, interp_phi
+    interp_angles = RegularGridInterpolator((phi, theta), ray_map[:, :, 1:3])
+    return interp_angles
 
 
 if __name__ == '__main__':
     angles, ray_map = load_map_data('data/angles.pickle',
                                     'data/ray_map.pickle')
-    interp_theta, interp_phi = create_map_interp_funcs(angles, ray_map)
+    interp_angles = create_map_interp_funcs(angles, ray_map)

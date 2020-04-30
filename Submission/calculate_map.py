@@ -181,7 +181,7 @@ def integrate_geo_eqns(t_end=-1e7, return_map=False):
     phi_camera = 0  # Azimuthal angle of the camera's location
 
     # Angles to evaluate map at in camera sky
-    Ntheta, Nphi = 25, 50
+    Ntheta, Nphi = 250, 500
     theta_cs = np.linspace(0, np.pi, Ntheta)
     phi_cs = np.linspace(0, 2*np.pi, Nphi)
 
@@ -248,7 +248,7 @@ if __name__ == '__main__':
                                   exclusive=False)
 
     # Save the sampled angles and corresponding map
-    with open('data/angles.pickle', 'wb') as f:
+    with open('data/angles_250_500.pickle', 'wb') as f:
         pickle.dump({'theta': theta, 'phi': phi}, f)
-    with open('data/ray_map.pickle', 'wb') as f:
+    with open('data/ray_map_250_500.pickle', 'wb') as f:
         pickle.dump(ray_map, f)

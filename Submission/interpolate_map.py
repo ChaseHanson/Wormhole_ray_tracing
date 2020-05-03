@@ -72,6 +72,51 @@ def load_map_data(angle_file, map_file):
         ray_map = pickle.load(f)
     return angles, ray_map
 
+def celestial_data_sorter(ray_map):
+    """
+    Sorts elements of the ray_map tensor based of the sign of distance ell at
+    each point (that is, which celestial sphere the light ray originates from).
+    Eliminates (hopefully) numerical artifacts from cross-interpolation of two
+    rays from different celestial spheres which have similar phi & theta, but
+    opposite sign.
+
+    Parameters
+    ----------
+    ray_map : str
+        The output map
+
+    Returns
+    -------
+    ray_map : str
+        The output map (but sorted)
+    """
+    Ntheta = 250 # = ray_map[1]
+    Nphi   = 500 # = ray_map[2]
+
+    sorter_helper_friend = np.zeros((Nphi))
+    temp_position = np.zeros(3)
+    temp_array = np.zeros((1, Ntheta, 3))
+
+    for i in range(Nphi): # == Nphi
+        for j in range(Ntheta - 1):
+            # If the initial theta's sign is - and the next is +, transfer all positional data
+            if ray_map[i, j, 0] < ray_map[i, j+1, 0]:
+                # prototypical sorting shuffle - transfer of sign, radial vector components
+                temp_position[0:3] = ray_map[i, j, :]
+                ray_map[i, j, :]   = ray_map[i, j+1, :]
+                ray_map[i, j+1, :] = temp_position[0:3]
+            if ray_map[i, j, 0] < 0:
+                sorter_helper_friend[i] += 1 # counts how many "pluses" there are - i.e. how many points are in the upper sphere
+
+    # I'm smart enough to know this can be optimized...I'm just not smart enough to know how
+    for i in range(Nphi - 1):
+        if sorter_helper_friend[i] < sorter_helper_friend[i+1]:
+            # prototypical sorting shuffle - transfer of sign, radial vector components
+            temp_array          = ray_map[i, :, :]
+            ray_map[i, :, :]    = ray_map[i+1, :, :]
+            ray_map[i+1, :, :]  = temp_array
+
+    return ray_map
 
 def create_map_interpolator(angles, ray_map):
     """
@@ -92,9 +137,90 @@ def create_map_interpolator(angles, ray_map):
     theta, phi = angles['theta'], angles['phi']
 
     # Interpolate the map
+
+    #print(ray_map)
+    #print("ray_map shape: \t\t", np.shape(ray_map))
+
+    Ntheta = 250 # = ray_map[1]
+    Nphi   = 500 # = ray_map[2]
+
+    ########################################
+    if False: # below is a very hopeless attempt at organizing celestial data
+        lower_theta = 0
+        lower_phi   = 0
+        lower = 0
+
+        for i in range(Nphi): # == Nphi
+            for j in range(Ntheta): # == Ntheta
+                if ray_map[i, j, 0] < 0:
+            #        print("ray_map ell less than zer0")
+                    lower += 1
+            #upper_theta += Ntheta - lower
+            lower_theta += lower
+            lower = 0
+            if ray_map[i, j, 0] < 0:
+            #    print("ray_map ell less than zer0")
+                lower_phi += 1
+
+        upper_theta = Ntheta - lower_theta
+        upper_phi = Nphi - lower_phi
+
+        print("lower_theta:\t\t", lower_theta)
+        print("upper_theta:\t\t", upper_theta)
+        print("Ntheta:\t\t", Ntheta)
+        print("lower_phi:\t\t", lower_phi)
+        print("upper_phi:\t\t", upper_phi)
+        print("Nphi:\t\t", Nphi)
+
+
+        ray_map_upper = np.zeros((upper_phi, upper_theta, 2))
+        ray_map_lower = np.zeros((lower_phi, lower_theta, 2))
+
+        for i in range(ray_map[1]): # == Nphi
+            for j in range(ray_map[2]): # == Ntheta
+                if ray_map[i, j, 0] < 0:
+                    ray_map_lower[i, j, 0:2] = ray_map[1:3]
+                else:
+                    ray_map_upper[i, j, 0:2] = ray_map[1:3]
+
+        interp_angles_lower = RegularGridInterpolator((phi, theta),
+                                                ray_map_lower[:, :, 0:2])
+
+        interp_angles_upper = RegularGridInterpolator((phi, theta),
+                                                ray_map_upper[:, :, 0:2])
+
+        lower = 0
+        bool = True
+
+        for i in range(Nphi%10): # == Nphi
+            for j in range(Ntheta%10): # == Ntheta
+                if ray_map[i, j, 0] < 0:
+            #        print("ray_map ell less than zer0")
+                    print("@@@ BOTTOM @@@")
+                else:
+                    print("---  TOP  ---")
+                    lower += 1
+
+        upper = Nphi * Ntheta - lower
+        ray_map_upper = np.zeros((upper, 2))
+        ray_map_lower = np.zeros((lower, 2))
+
+        interp_angles_lower = RegularGridInterpolator((phi, theta),
+                                                ray_map_lower[:, 0:2])
+
+        interp_angles_upper = RegularGridInterpolator((phi, theta),
+                                                ray_map_upper[:, 0:2])
+
+
+        return interp_angles_lower, interp_angles_upper
+        #######################################################
+
+    ray_map = celestial_data_sorter(ray_map)
+
     interp_angles = RegularGridInterpolator((phi, theta),
                                             ray_map[:, :, 1:3])
     return interp_angles
+    # Else, if sign of ell is positive, interpolate in upper celestial sphere.
 
 
 def wormhole_warp(xy, interp_func):

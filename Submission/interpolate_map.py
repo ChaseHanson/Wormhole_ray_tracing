@@ -162,16 +162,20 @@ def create_map_interpolator(angles, ray_map):
     #print(ray_map)
     #print("ray_map shape: \t\t", np.shape(ray_map))
 
-    ray_map_lower, ray_map_upper = celestial_data_sorter(ray_map)
+    ray_map_lower, ray_map_upper, = celestial_data_sorter(ray_map)
 
     #print(ray_map_lower, "\n\n", ray_map_upper, "\n\n", np.shape(ray_map_lower), "\n\n", np.shape(ray_map_upper))
     # Arrays are looking as they should, for 250*500=125000 signs, we have shapes (4437, 2) for lower and (120563, 2) for upper
 
-    interp_angles_lower = RegularGridInterpolator((phi, theta),
-                                            ray_map_lower[:, :])
+    lower_index = range(len(ray_map_lower))
+    upper_index = range(len(ray_map_upper))
+    th, ph = range(2), range(2)
 
-    interp_angles_upper = RegularGridInterpolator((phi, theta),
-                                            ray_map_upper[:, :])
+    interp_angles_lower = RegularGridInterpolator((lower_index, th),
+                                            ray_map_lower[:])
+
+    interp_angles_upper = RegularGridInterpolator((upper_index, ph),
+                                            ray_map_upper[:])
 
     return interp_angles_lower, interp_angles_upper
     # Else, if sign of ell is positive, interpolate in upper celestial sphere.
@@ -210,7 +214,7 @@ if __name__ == '__main__':
                                     'data/ray_map_250_500.pickle')
     interp_angles_lower, interp_angles_upper = create_map_interpolator(angles, ray_map)
     image_path_lower = 'images/saturn.jpg'
-    image_path_upper = 'images/star_field'
+    image_path_upper = 'images/star_field.jpg'
     image_lower = io.imread(image_path_lower)
     image_upper = io.imread(image_path_upper)
 

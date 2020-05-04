@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import interp2d
 from skimage import io
 from skimage.transform import warp
 import datetime
@@ -148,7 +149,8 @@ def create_map_interpolator(angles, ray_map):
     lower = 0
     lower_check = 0
     total_phi = 0
-
+    ray_map_lower = ray_map
+    ray_map_upper = ray_map
     #ray_map = celestial_data_sorter(ray_map)
     ray_map_lower = ray_map[ray_map[:,:,0]<0]
     ray_map_upper = ray_map[ray_map[:,:,0]>0]
@@ -156,27 +158,30 @@ def create_map_interpolator(angles, ray_map):
         lower_check = 0
         for j in range(Ntheta):
             if ray_map[i,j,0] < 0:
-                lower_check +=1
-        lower += Ntheta - lower_check
+                lower_check =1
+        if lower_check == 1:
+            total_phi += 1
 
     print("total phi count: ", total_phi)
-    upper_phi = total_phi
+    lower_phi = total_phi
+    up_phi = Nphi - lower_phi
     upper
     print(len(ray_map_lower))
     low_count = len(ray_map_lower)
+    theta_low = np.floor(low_count/lower_phi)
     up_count = len(ray_map_upper)
+    theta_up = np.floor(up_count/up_phi)
     angle_low = np.zeros(low_count)
     angle_up = np.zeros(up_count)
     print(np.shape(ray_map_lower))
     print(ray_map_upper)
     print(np.shape(ray_map_upper))
 
-    interp_lower=RegularGridInterpolator((low_count,2),ray_map_lower[:,0:2])
-    interp_upper=RegularGridInterpolator((up_count,2),ray_map_upper[:,0:2])
-    #interp_angles = RegularGridInterpolator((phi, theta),
-                                            #ray_map[:, :, 1:3])
+    #interp_lower=RegularGridInterpolator((lower_phi,theta_low),ray_map_lower[:,0:2])
+    #interp_upper=RegularGridInterpolator((up_phi,theta_up),ray_map_upper[:,0:2])
+    interp_angles_upper = interp2d(ray_map_upper[:,:,1],ray_map_upper[:,:,2],)
 
-    return interp_lower, interp_upper
+    return interp_angles
     # Else, if sign of ell is positive, interpolate in upper celestial sphere.
 
 
@@ -211,21 +216,22 @@ def wormhole_warp(xy, interp_func):
 if __name__ == '__main__':
     angles, ray_map = load_map_data('data/angles_250_500.pickle',
                                     'data/ray_map_250_500.pickle')
-    interp_angles_lower, interp_angles_upper = create_map_interpolator(angles, ray_map)
-
+    #interp_angles_lower, interp_angles_upper = create_map_interpolator(angles, ray_map)
+    interp_angles = create_map_interpolator(angles, ray_map)
+    print(type(interp_angles))
     image_path_lower = 'images/saturn.jpg'
     image_path_upper = 'images/star_field.jpg'
     image_low = io.imread(image_path_lower)
     image_up = io.imread(image_path_upper)
 
-    map_args_lower = {'interp_func': interp_angles_lower}
-    map_args_upper = {'interp_func': interp_angles_upper}
+    map_args_lower = {'interp_func': interp_angles}
+    #map_args_upper = {'interp_func': interp_angles_upper}
     warped_image_lower = warp(image_low, wormhole_warp, map_args=map_args_lower)
-    warped_image_upper = warp(image_up, wormhole_warp, map_args=map_args_upper)
+    #warped_image_upper = warp(image_up, wormhole_warp, map_args=map_args_upper)
     plt.close('all')
     fig, (ax1,ax2) = plt.subplots(1, 2)
     ax1.imshow(warped_image_lower)
-    ax2.imshow(warped_image_upper)
+    #ax2.imshow(warped_image_upper)
     fig.savefig('images/warped_dneg_star_field_250_500_map.png', bbox_inches='tight')
     fig.show()
 

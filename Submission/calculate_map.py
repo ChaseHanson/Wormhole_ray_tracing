@@ -232,6 +232,7 @@ if __name__ == '__main__':
     end = datetime.datetime.now()
     print('Ended at {}'.format(end.strftime('%Y-%m-%d %H:%M:%S')))
     print('Elapsed time: {}'.format(end - start))
+    
     # Wrap angles to the appropriate interval: [0, pi) for theta and
     # [0, 2*pi) for phi,
     ray_map[:, :, 1] = wrap_angle(ray_map[:, :, 1], np.pi)

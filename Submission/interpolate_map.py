@@ -97,6 +97,8 @@ def celestial_data_sorter(ray_map):
     temp_position = np.zeros(3)
     temp_array = np.zeros((1, Ntheta, 3))
 
+    Nminus, Nplus = 0, 0
+
     for i in range(Nphi): # == Nphi
         for j in range(Ntheta - 1):
             # If the initial theta's sign is - and the next is +, transfer all positional data
@@ -106,6 +108,8 @@ def celestial_data_sorter(ray_map):
                 ray_map[i, j, :]   = ray_map[i, j+1, :]
                 ray_map[i, j+1, :] = temp_position[0:3]
             if ray_map[i, j, 0] < 0:
+                #print(ray_map[i, j, 0], end =" ")
+                Nminus += 1
                 sorter_helper_friend[i] += 1 # counts how many "pluses" there are - i.e. how many points are in the upper sphere
 
     # I'm smart enough to know this can be optimized...I'm just not smart enough to know how
@@ -116,7 +120,24 @@ def celestial_data_sorter(ray_map):
             ray_map[i, :, :]    = ray_map[i+1, :, :]
             ray_map[i+1, :, :]  = temp_array
 
-    return ray_map
+    N     = Nphi * Ntheta
+    Nplus = N - Nminus
+
+    ray_map_lower = []
+    ray_map_upper = []
+
+    for i in range(Nphi):
+        for j in range(Ntheta):
+            if ray_map[i, j, 0] < 0:
+                ray_map_lower.append(ray_map[i, j, 1:3])
+            else:
+                ray_map_upper.append(ray_map[i, j, 1:3])
+
+    ray_map_lower = np.array(ray_map_lower)
+    ray_map_upper = np.array(ray_map_upper)
+
+    return ray_map_lower, ray_map_upper
+
 
 def create_map_interpolator(angles, ray_map):
     """
@@ -141,14 +162,22 @@ def create_map_interpolator(angles, ray_map):
     #print(ray_map)
     #print("ray_map shape: \t\t", np.shape(ray_map))
 
-    Ntheta = 250 # = ray_map[1]
-    Nphi   = 500 # = ray_map[2]
+    ray_map_lower, ray_map_upper, = celestial_data_sorter(ray_map)
 
-    ray_map = celestial_data_sorter(ray_map)
+    #print(ray_map_lower, "\n\n", ray_map_upper, "\n\n", np.shape(ray_map_lower), "\n\n", np.shape(ray_map_upper))
+    # Arrays are looking as they should, for 250*500=125000 signs, we have shapes (4437, 2) for lower and (120563, 2) for upper
 
-    interp_angles = RegularGridInterpolator((phi, theta),
-                                            ray_map[:, :, 1:3])
-    return interp_angles
+    lower_index = range(len(ray_map_lower))
+    upper_index = range(len(ray_map_upper))
+    th, ph = range(2), range(2)
+
+    interp_angles_lower = RegularGridInterpolator((lower_index, th),
+                                            ray_map_lower[:])
+
+    interp_angles_upper = RegularGridInterpolator((upper_index, ph),
+                                            ray_map_upper[:])
+
+    return interp_angles_lower, interp_angles_upper
     # Else, if sign of ell is positive, interpolate in upper celestial sphere.
 
 
@@ -183,13 +212,17 @@ def wormhole_warp(xy, interp_func):
 if __name__ == '__main__':
     angles, ray_map = load_map_data('data/angles_250_500.pickle',
                                     'data/ray_map_250_500.pickle')
-    interp_angles = create_map_interpolator(angles, ray_map)
+    interp_angles_lower, interp_angles_upper = create_map_interpolator(angles, ray_map)
+    image_path_lower = 'images/saturn.jpg'
+    image_path_upper = 'images/star_field.jpg'
+    image_lower = io.imread(image_path_lower)
+    image_upper = io.imread(image_path_upper)
 
-    image_path = 'images/saturn.jpg'
-    image = io.imread(image_path)
+    map_args_lower = {'interp_func': interp_angles_lower}
+    warped_image_lower = warp(image_lower, wormhole_warp, map_args=map_args_lower)
 
-    map_args = {'interp_func': interp_angles}
-    warped_image = warp(image, wormhole_warp, map_args=map_args)
+    map_args_upper = {'interp_func': interp_angles_upper}
+    warped_image_upper = warp(image_upper, wormhole_warp, map_args=map_args_upper)
 
     plt.close('all')
     fig, ax = plt.subplots(1, 1)
@@ -197,9 +230,30 @@ if __name__ == '__main__':
     fig.savefig('images/warped_dneg_saturn_250_500_map.png', bbox_inches='tight')
     fig.show()
 
-    # for i in range(len(test[:, :, 0])):
-    #     for j in range(len(test[:, :, 0][0])):
-    #         test[i, j, 0] = find_nearest(np.unique(im_phi),
-    #                                      test[i, j, 0])
-    #         test[i, j, 1] = find_nearest(np.unique(im_theta),
-    #                                      test[i, j, 1])
+
+
+
+
+if False:
+    if __name__ == '__main__':
+        angles, ray_map = load_map_data('data/angles_250_500.pickle',
+                                        'data/ray_map_250_500.pickle')
+        interp_angles = create_map_interpolator(angles, ray_map)
+        image_path = 'images/saturn.jpg'
+        image = io.imread(image_path)
+
+        map_args = {'interp_func': interp_angles}
+        warped_image = warp(image, wormhole_warp, map_args=map_args)
+
+        plt.close('all')
+        fig, ax = plt.subplots(1, 1)
+        ax.imshow(warped_image)
+        fig.savefig('images/warped_dneg_saturn_250_500_map.png', bbox_inches='tight')
+        fig.show()
+
+        # for i in range(len(test[:, :, 0])):
+        #     for j in range(len(test[:, :, 0][0])):
+        #         test[i, j, 0] = find_nearest(np.unique(im_phi),
+        #                                      test[i, j, 0])
+        #         test[i, j, 1] = find_nearest(np.unique(im_theta),
+        #                                      test[i, j, 1])

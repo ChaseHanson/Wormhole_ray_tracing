@@ -48,4 +48,9 @@ class Wormhole:
         dr/dl : float
 
         """
-        return 2 / np.pi * np.arctan((2 * ell) / (np.pi * self.M))
+        x = 2 * (np.abs(ell) - self.a) / (np.pi * self.M)  # 5b
+        if np.abs(ell) > self.a:
+            drdl = 2 / np.pi * np.arctan(x) * np.sign(ell)
+        else:
+            drdl = 0  # Since r is independent of ell inside the wormhole
+        return drdl

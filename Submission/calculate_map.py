@@ -172,7 +172,7 @@ def integrate_geo_eqns(t_end=-1e7, return_map=False):
     phi_camera = 0  # Azimuthal angle of the camera's location
 
     # Angles to evaluate map at in camera sky
-    Ntheta, Nphi = 1000, 2000
+    Ntheta, Nphi = 150, 300
     theta_cs = np.linspace(0, np.pi, Ntheta)
     phi_cs = np.linspace(0, 2*np.pi, Nphi)
 
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     end = datetime.datetime.now()
     print('Ended at {}'.format(end.strftime('%Y-%m-%d %H:%M:%S')))
     print('Elapsed time: {}'.format(end - start))
-    
+
     # Wrap angles to the appropriate interval: [0, pi) for theta and
     # [0, 2*pi) for phi,
     ray_map[:, :, 1] = wrap_angle(ray_map[:, :, 1], np.pi)

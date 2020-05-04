@@ -138,7 +138,7 @@ def celestial_data_sorter(ray_map):
     ray_map_lower = np.array(ray_map_lower)
     ray_map_upper = np.array(ray_map_upper)
 
-    return ray_map_lower, ray_map_upper
+    return ray_map
 
 
 def create_map_interpolator(angles, ray_map):
@@ -157,7 +157,9 @@ def create_map_interpolator(angles, ray_map):
     interp_theta, interp_phi : function
     """
     # Load the angles
-    theta, phi = angles['theta'], angles['phi']
+    lsign, theta, phi = 2, angles['theta'], angles['phi']
+
+    #lsign[0] = 1 #upper sphere
 
     # The sign of the final location of the ray
     sign = ray_map[:, :, 0]
@@ -175,6 +177,7 @@ def create_map_interpolator(angles, ray_map):
     #print(ray_map)
     #print("ray_map shape: \t\t", np.shape(ray_map))
 
+<<<<<<< HEAD
     # ray_map_lower, ray_map_upper, = celestial_data_sorter(ray_map)
     # pdb.set_trace()
 
@@ -231,6 +234,28 @@ def create_map_interpolator(angles, ray_map):
 
 
 def wormhole_warp(xy, interp_funcs):
+=======
+    ray_map = celestial_data_sorter(ray_map)
+
+    #print(ray_map_lower, "\n\n", ray_map_upper, "\n\n", np.shape(ray_map_lower), "\n\n", np.shape(ray_map_upper))
+    # Arrays are looking as they should, for 250*500=125000 signs, we have shapes (4437, 2) for lower and (120563, 2) for upper
+    sign = ray_map[:, :, 0]
+    upper_ray_map = ray_map.copy()
+    upper_ray_map[:, :, 1:3][sign < 0] = np.nan # preserve rays that go to upper celestial sphere
+
+    lower_ray_map = ray_map.copy()
+    upper_ray_map[:, :, 1:3][sign > 0] = np.nan # preserve rays that go to upper celestial sphere
+    interp_angles_upper = RegularGridInterpolator((phi, theta),
+                                            upper_ray_map)
+    interp_angles_lower = RegularGridInterpolator((phi, theta),
+                                            lower_ray_map)
+
+    return interp_angles_upper, interp_angles_lower
+    # Else, if sign of ell is positive, interpolate in upper celestial sphere.
+
+
+def wormhole_warp(xy, interp_func):
+>>>>>>> 9e651262c876a4f84234d66409f1b87a57e53c17
     # first column is phi, second column is theta
     im_angles = pixels_to_angles(xy)
     unique_phi = np.unique(im_angles[:, 0])
@@ -260,14 +285,22 @@ def wormhole_warp(xy, interp_funcs):
 
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     angles, ray_map = load_map_data('data/angles_100_200.pickle',
                                     'data/ray_map_100_200.pickle')
     interp_angles = create_map_interpolator(angles, ray_map)
+=======
+    angles, ray_map = load_map_data('data/angles_250_500.pickle',
+                                    'data/ray_map_250_500.pickle')
+    interp_angles_upper, interp_angles_lower = create_map_interpolator(angles, ray_map)
+    # create interpolator for lower celestial sphere
+>>>>>>> 9e651262c876a4f84234d66409f1b87a57e53c17
     image_path_lower = 'images/saturn.jpg'
     image_path_upper = 'images/star_field.jpg'
     image_lower = io.imread(image_path_lower)
     image_upper = io.imread(image_path_upper)
 
+<<<<<<< HEAD
     # Sort both the input angles on the camera sky and the output map
     # by which celestial sphere they're on
     sign = ray_map[:, :, 0]  # The sign of the final location of the ray
@@ -292,6 +325,20 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(1, 1)
     ax.imshow(warped_image)
     fig.savefig('images/warped_test.png', bbox_inches='tight')
+=======
+    map_args_lower = {'interp_func': interp_angles_upper}
+    warped_image_lower = warp(image_lower, wormhole_warp, map_args=map_args_lower)
+
+    # Warp the two images individually
+
+    #map_args_upper = {'interp_func': interp_angles_upper}
+    #warped_image_upper = warp(image_upper, wormhole_warp, map_args=map_args_upper)
+
+    plt.close('all')
+    fig, ax = plt.subplots(1, 1)
+    ax.imshow(warped_image_lower)
+    fig.savefig('images/warped_dneg_saturn_250_500_map.png', bbox_inches='tight')
+>>>>>>> 9e651262c876a4f84234d66409f1b87a57e53c17
     fig.show()
 
 
@@ -300,9 +347,15 @@ if __name__ == '__main__':
 
 if False:
     if __name__ == '__main__':
+<<<<<<< HEAD
         angles, ray_map = load_map_data('data/angles_100_200.pickle',
                                         'data/ray_map_100_200.pickle')
         interp_angles = create_map_interpolator(angles, ray_map)
+=======
+        angles, ray_map = load_map_data('data/angles_250_500.pickle',
+                                        'data/ray_map_250_500.pickle')
+        interp_angles_lower = create_map_interpolator(angles, ray_map)
+>>>>>>> 9e651262c876a4f84234d66409f1b87a57e53c17
         image_path = 'images/saturn.jpg'
         image = io.imread(image_path)
 

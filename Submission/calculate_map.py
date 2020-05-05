@@ -1,35 +1,27 @@
 import numpy as np
-import pickle
 from scipy.integrate import solve_ivp
+import pickle
+import datetime
 from wormhole import Wormhole
 
 
-def wrap_angle(angle, max_angle=2*np.pi, exclusive=True):
+def wrap_angle(angle, max_angle):
     """
-    Wraps angles to the range [0, max_angle) (exclusive by
-    default, but can be inclusive of max_angle)
+    Wraps angles to the range [0, max_angle)
 
     Parameters
     ----------
     angle : int, float, or array-like
         The angle(s) to wrap
-    max_angle : int or float, optional
-        The maximum angle possible (default 2*pi)
-    exclusive : bool, optional
-        Whether to exclude the maximum angle (default True)
+    max_angle : int or float
+        The maximum angle possible
 
     Returns
     -------
     wrapped_angle : int, float, or array_like
         The wrapped angle(s)
     """
-    if exclusive:
-        wrapped_angle = angle % max_angle
-    else:
-        max_angle_ind = np.where(angle == max_angle)[0]
-        wrapped_angle = angle % max_angle
-        wrapped_angle[max_angle_ind] = max_angle
-    return wrapped_angle
+    return angle % max_angle
 
 
 def calc_camera_unit_vector(theta_cs, phi_cs):
@@ -113,7 +105,7 @@ def calc_canonical_momenta(r, theta, n_ell, n_theta, n_phi):
     return p_ell, p_theta, p_phi
 
 
-def calc_b_Bsquared(p_phi, r, n_theta, n_phi):
+def calc_b_Bsquared(r, theta, n_theta, n_phi):
     """
     Calculate the light ray's constants of motion with Equation (A9d)
 
@@ -136,12 +128,13 @@ def calc_b_Bsquared(p_phi, r, n_theta, n_phi):
         The ray's constants of motion
     """
     # Equation (A9d)
-    b = p_phi
-    B_squared = r**2 * (n_theta**2 + n_phi**2)
+    b = r * np.sin(theta) * n_phi  # p_phi
+    B_squared = r**2 * (n_theta**2 + n_phi**2)  # (p_theta)^2 +
+                                                # (p_phi)^2 / sin^2(theta)
     return b, B_squared
 
 
-def geo_eqns(ray_arr, n_theta, n_phi, wormhole):
+def geo_eqns(ray_arr, b, B_squared, wormhole):
     # Sort out the quantities in the ray array
     ell, theta, phi = ray_arr[0], ray_arr[1], ray_arr[2]
     p_ell, p_theta = ray_arr[3], ray_arr[4]
@@ -149,11 +142,10 @@ def geo_eqns(ray_arr, n_theta, n_phi, wormhole):
     # The ray's distance from the wormhole's axis of symmetry
     r = wormhole.calc_r(ell)
     # And how quickly the ray's distance is changing
-    dr_dl     = wormhole.calc_drdl(ell)
+    dr_dl = wormhole.calc_drdl(ell)
 
-    # The ray's constants of motion
-    p_phi = r * np.sin(theta) * n_phi  # Equation (A9c)
-    b, B_squared = calc_b_Bsquared(p_phi, r, n_theta, n_phi)
+    # # The ray's constants of motion
+    # b, B_squared = calc_b_Bsquared(r, theta, n_theta, n_phi)
 
     # Set up the right hand side of the system with Equations (A7a) - (A7e)
     dl_dt = p_ell  # A7a
@@ -165,7 +157,7 @@ def geo_eqns(ray_arr, n_theta, n_phi, wormhole):
     return np.array([dl_dt, dtheta_dt, dphi_dt, dpl_dt, dptheta_dt])
 
 
-def integrate_geo_eqns(t_end=-100, return_map=False):
+def integrate_geo_eqns(t_end=-1e7, return_map=False):
     # Wormhole parameters
     a = 0.01  # Half the height of wormhole's cylinder interior
            # in the embedding space
@@ -178,9 +170,9 @@ def integrate_geo_eqns(t_end=-100, return_map=False):
     theta_camera = np.pi/2  # Zenith angle of the camera's location,
                             # in the equatorial plane
     phi_camera = 0  # Azimuthal angle of the camera's location
-    
+
     # Angles to evaluate map at in camera sky
-    Ntheta, Nphi = 25, 50
+    Ntheta, Nphi = 150, 300
     theta_cs = np.linspace(0, np.pi, Ntheta)
     phi_cs = np.linspace(0, 2*np.pi, Nphi)
 
@@ -193,12 +185,12 @@ def integrate_geo_eqns(t_end=-100, return_map=False):
     # axis of symmetry
     r_init = wormhole.calc_r(ell_camera)
 
-    # Calculate the incoming light ray's canonical momenta
+    # Calculate the incoming light ray's initial canonical momenta
     p_ell, p_theta, p_phi = calc_canonical_momenta(r_init, theta_cs,
                                                    n_ell, n_theta, n_phi)
 
     # The ray's constants of motion
-    b, B_squared = calc_b_Bsquared(p_phi, r_init, n_theta, n_phi)
+    b, B_squared = calc_b_Bsquared(r_init, theta_camera, n_theta, n_phi)
 
     # Initial conditions for (ell, theta, phi, p_ell, p_theta)
     # The ray starts at the camera's location, we will integrate
@@ -216,33 +208,38 @@ def integrate_geo_eqns(t_end=-100, return_map=False):
     for i in range(Nphi):
         for j in range(Ntheta):
             # The right hand side of the ray equations
-            f = lambda t, y: geo_eqns(y, n_theta[i, j],
-                                      n_phi[i, j], wormhole)
+            f = lambda t, y: geo_eqns(y, b[i, j], B_squared[i, j], wormhole)
             init_ray_arr = ray_arr[:, i, j]
             ray_integrated = solve_ivp(f, t_range, init_ray_arr,
                                        method='RK45')
             final_ray = ray_integrated.y[:, -1]
-            
+
             # Store the sign of ell, which determines which
             # celestial sphere we're on
             ray_map[i, j, 0] = np.sign(final_ray[0])
             # Store phi and theta
-            ray_map[i, j, 1:3] = final_ray[1:3]            
+            ray_map[i, j, 1:3] = final_ray[1:3]
 
     if return_map:
         return theta_cs, phi_cs, ray_map
 
 
 if __name__ == '__main__':
-    theta, phi, ray_map = integrate_geo_eqns(t_end=-1e5,
+    start = datetime.datetime.now()
+    print('Started at {}'.format(start.strftime('%Y-%m-%d %H:%M:%S')))
+    theta, phi, ray_map = integrate_geo_eqns(t_end=-1e7,
                                              return_map=True)
-    # Wrap angles to the appropriate interval
-    ray_map[:, :, 1] = wrap_angle(ray_map[:, :, 1], 2*np.pi)
-    ray_map[:, :, 2] = wrap_angle(ray_map[:, :, 2], np.pi,
-                                  exclusive=False)
+    end = datetime.datetime.now()
+    print('Ended at {}'.format(end.strftime('%Y-%m-%d %H:%M:%S')))
+    print('Elapsed time: {}'.format(end - start))
+
+    # Wrap angles to the appropriate interval: [0, pi) for theta and
+    # [0, 2*pi) for phi,
+    ray_map[:, :, 1] = wrap_angle(ray_map[:, :, 1], np.pi)
+    ray_map[:, :, 2] = wrap_angle(ray_map[:, :, 2], 2*np.pi)
 
     # Save the sampled angles and corresponding map
-    with open('data/angles.pickle', 'wb') as f:
+    with open('data/angles_150_300.pickle', 'wb') as f:
         pickle.dump({'theta': theta, 'phi': phi}, f)
-    with open('data/ray_map.pickle', 'wb') as f:
+    with open('data/ray_map_150_300.pickle', 'wb') as f:
         pickle.dump(ray_map, f)

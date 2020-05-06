@@ -1,2 +1,8 @@
-Summarize the contributions of the teammates here.
+For the majority of this project, all three members worked on a Zoom call and
+(despite what the commit history might suggest) there was synchronous collaboration.
 
+All group members collaborated to build initial functionality with initial conditions and integration.
+L.R.W. streamlined the code and implemented the image processing to warp the input images after interpolating
+the map. Q.M.W and C.J.H researched possible solutions and performed analysis to solve a major tabulation and
+interpolation error with the initial build. Q.M.W and C.J.H hacked the solution individually, and L.R.W
+implemented the final fix.

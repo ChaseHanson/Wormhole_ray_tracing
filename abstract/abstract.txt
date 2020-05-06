@@ -1,0 +1,15 @@
+Through the wormhole: using ray-tracing to visualize the wormhole of Interstellar.
+
+Chase Hanson, Quinn White, Lily Whitler
+
+A wormhole is a theoretical object that connects two different points in spacetime, and while these objects have not
+been observed in our universe, using the equations of general relativity and the method of ray-tracing, we can
+visualize their effects on spacetime. Following the methods of James et al. (2015), the geodesic equation was
+numerically integrated using RK45, and incident rays of light were followed back through or around the wormhole
+to their origins in spacetime. From a discrete grid, the traced rays were interpolated based on which side of
+the wormhole the rays originated to build an image for the observer. We present these images for varying wormhole
+lengths and lensing widths to recreate visuals from James et al. Future work would involve parallelization of the
+ray-tracing algorithm, improving the resolution of the lensed images, and generating a moving picture.
+
+The unlicensed code is available at
+https://github.com/ASU-CompMethodsPhysics-PHY494/final-2020-hans-zimmer-fan-club/.
